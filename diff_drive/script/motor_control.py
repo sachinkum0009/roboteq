@@ -9,19 +9,9 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
 
 
 
-rospy.init_node('odometry_publisher')
-
-odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
-odom_broadcaster = tf.TransformBroadcaster()
+rospy.init_node('motor_driver_node')
 
 
-x_in = 0
-y_in = 0
-theta_in = 0
-
-vx = 0.1
-vy = -0.1
-vth = 0.1
 
 current_time = rospy.Time.now()
 last_time = rospy.Time.now()
@@ -49,8 +39,8 @@ class driver:
         sendturn = '!g 2 {}_'.format(turn)
 
         #print message
-        print sendgo
-        print sendturn
+        print(sendgo)
+        print(sendturn)
 
         # send by serial
         self.ser.write(sendgo)
@@ -79,12 +69,6 @@ ser.write("# 10\r")                     # read data every 10ms
 ser.write("!CB 1 0_!CB 2 0\r")          # set counter to 0
 
 
-def calculate_diff(new,old):
-    if old>25000 and new <-25000:
-        return 65536 - (old-new)
-    else:
-        return new-old
-
 
 try:
     d = driver(ser)
@@ -96,52 +80,10 @@ except rospy.ROSInterruptException:
 while not rospy.is_shutdown():
     current_time = rospy.Time.now()
 
-    # compute odometry in a typical way given the velocities of the robot
-    dt = (current_time - last_time).to_sec()
-
+    
     message = read_controller()
-    # diff drive formula
-    msg_diff = [calculate_diff(message[0],prev_message[0]), calculate_diff(message[1], prev_message[1])]
-    prev_message = message
-    wheel_rad = 0.045   #wheel radius
-    wheel_dist = 0.25 #weel distance
-    encoder_coef = 7#number of pulses for a full turn
-    #kinematics and integration to get coordinates:
-    theta = (float(wheel_rad)*(float(msg_diff[0]-msg_diff[1])/encoder_coef))/float(wheel_dist)
-    theta_in += theta
-    x = float(wheel_rad)/2.0*(float(msg_diff[0]+msg_diff[1])/encoder_coef)*cos(theta_in) 
-    x_in += x
-    y = float(wheel_rad)/2.0*(float(msg_diff[0]+msg_diff[1])/encoder_coef)*sin(theta_in) 
-    y_in += y
-
-    # since all odometry is 6DOF we'll need a quaternion created from yaw
-    odom_quat = tf.transformations.quaternion_from_euler(0, 0, theta_in)
-
-    # first, we'll publish the transform over tf
-    odom_broadcaster.sendTransform(
-        (x_in, y_in, 0),
-        odom_quat,
-        current_time,
-        "chassis", 
-        "world"
-    ) 
-     
-    # next, we'll publish the odometry message over ROS
-    odom = Odometry()
-    odom.header.stamp = current_time
-    odom.header.frame_id = "chassis"
-
-    # set the position
-    odom.pose.pose = Pose(Point(x, y, 0.), Quaternion(*odom_quat))
-
-    # set the velocity
-    odom.child_frame_id = "world"
-    odom.twist.twist = Twist(Vector3(vx, vy, 0), Vector3(0, 0, vth))
-
-    # publish the message
-    odom_pub.publish(odom)
-
-    last_time = current_time
+    print('message')
+    print(message)
         
 
 
